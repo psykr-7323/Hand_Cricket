@@ -45,6 +45,12 @@ const getRemainingTossSide = (assignment) => {
   return null;
 };
 
+const getPlayerTeam = (state, playerId) => {
+  if (state.teams?.teamA?.roster?.includes(playerId)) return 'teamA';
+  if (state.teams?.teamB?.roster?.includes(playerId)) return 'teamB';
+  return null;
+};
+
 const computeSeriesWinner = (seriesScores, seriesLength) => {
   const needed = Math.ceil((seriesLength ?? 1) / 2);
   if ((seriesScores.teamA ?? 0) >= needed) return 'teamA';
@@ -104,6 +110,34 @@ const buildNextMatchUpdates = (state, path) => ({
   [path('superOver')]: createSuperOverState(),
 });
 
+const buildSeriesResetUpdates = (state, path) => {
+  const resetPlayers = Object.fromEntries(
+    Object.entries(state.players || {}).map(([id, player]) => [
+      id,
+      {
+        ...player,
+        isReady: player.isBot ? true : false,
+      },
+    ])
+  );
+
+  return {
+    [path('meta/status')]: 'MP_LOBBY',
+    [path('settings/currentMatch')]: 1,
+    [path('players')]: resetPlayers,
+    [path('captains')]: { teamA: null, teamB: null },
+    [path('teams')]: null,
+    [path('draft')]: null,
+    [path('toss')]: null,
+    [path('matchToss')]: null,
+    [path('match')]: createMatchState(),
+    [path('series')]: { scores: { teamA: 0, teamB: 0 }, results: [], winner: null },
+    [path('superOver')]: createSuperOverState(),
+    [path('resultMeta')]: null,
+    [path('chat/messages')]: null,
+  };
+};
+
 const decideSuperOverWinner = (score, wickets, fallbackWinner) => {
   if (score.teamA !== score.teamB) {
     return score.teamA > score.teamB ? 'teamA' : 'teamB';
@@ -121,12 +155,49 @@ export function MultiplayerProvider({ children }) {
     phase: 'MP_GATEWAY',
     roomCode: '',
     userId: generatePlayerId(),
-    name: 'Player 1'
+    name: 'Player 1',
+    notice: null,
   });
 
   const { roomState, actions, isHost } = useGameRoom(localState.roomCode, localState.userId);
 
   const state = useMemo(() => {
+    const wasKickedOut =
+      Boolean(localState.roomCode) &&
+      Boolean(roomState?.players) &&
+      !roomState.players[localState.userId];
+
+    if (wasKickedOut) {
+      return {
+        phase: 'MP_GATEWAY',
+        roomCode: '',
+        hostId: '',
+        currentPlayerId: localState.userId,
+        notice: 'You were kicked out of the room by the admin.',
+        settings: defaultSettings,
+        players: {},
+        captains: { teamA: null, teamB: null },
+        teams: { teamA: null, teamB: null },
+        draftPool: [],
+        draftTurn: 'teamA',
+        matchTossMoves: { captainA: null, captainB: null },
+        tossMoves: { captainA: null, captainB: null },
+        chatMessages: [],
+        lockedMoves: { batterMove: null, bowlerMove: null },
+        currentOverLog: [],
+        ballLog: [],
+        usedBowlersThisOver: [],
+        inningsResults: [],
+        playerStats: {},
+        score: { batting: 0, bowling: 0 },
+        wickets: { batting: 0, bowling: 0 },
+        seriesScores: { teamA: 0, teamB: 0 },
+        matchResults: [],
+        seriesWinner: null,
+        resultMeta: null,
+      };
+    }
+
     if (roomState) {
       const mapped = mapFirebaseToState(roomState, localState);
       if (mapped) return mapped;
@@ -136,6 +207,7 @@ export function MultiplayerProvider({ children }) {
       roomCode: localState.roomCode || '',
       hostId: localState.userId || '',
       currentPlayerId: localState.userId,
+      notice: localState.notice,
       settings: defaultSettings,
       players: {},
       captains: { teamA: null, teamB: null },
@@ -144,6 +216,7 @@ export function MultiplayerProvider({ children }) {
       draftTurn: 'teamA',
       matchTossMoves: { captainA: null, captainB: null },
       tossMoves: { captainA: null, captainB: null },
+      chatMessages: [],
       lockedMoves: { batterMove: null, bowlerMove: null },
       currentOverLog: [],
       ballLog: [],
@@ -256,6 +329,22 @@ export function MultiplayerProvider({ children }) {
       // So no auto-resolve here, let the UI trigger it to show the OUT animation.
     }
 
+    if (state.phase === 'MP_MATCH' && state.lockedMoves.batterMove != null && state.lockedMoves.bowlerMove != null) {
+      update(ref(db), {
+        [path('meta/status')]: 'MP_RESOLVE_MOVE',
+      });
+    }
+
+    if (
+      state.phase === 'MP_SUPER_OVER' &&
+      state.superOver?.lockedMoves?.batterMove != null &&
+      state.superOver?.lockedMoves?.bowlerMove != null
+    ) {
+      update(ref(db), {
+        [path('meta/status')]: 'MP_RESOLVE_SO',
+      });
+    }
+
   }, [isHost, roomState, state, path]);
 
 
@@ -270,7 +359,7 @@ export function MultiplayerProvider({ children }) {
       case 'MP_CREATE_ROOM': {
         const rc = generateRoomCode();
         const playerName = action.payload?.name || 'Player 1';
-        setLocalState(s => ({ ...s, roomCode: rc, phase: 'MP_CREATE_SETTINGS' }));
+        setLocalState(s => ({ ...s, roomCode: rc, phase: 'MP_CREATE_SETTINGS', notice: null }));
         
         set(ref(db, `rooms/${rc}`), {
           meta: { hostId: localState.userId, createdAt: Date.now(), status: 'MP_CREATE_SETTINGS' },
@@ -287,7 +376,7 @@ export function MultiplayerProvider({ children }) {
         const name = action.payload?.name;
         const code = action.payload.code.toUpperCase();
         // Basic join
-        setLocalState(s => ({ ...s, roomCode: code }));
+        setLocalState(s => ({ ...s, roomCode: code, notice: null }));
         // Can't await here directly but we run it
         update(ref(db), {
           [`rooms/${code}/players/${localState.userId}`]: {
@@ -300,9 +389,15 @@ export function MultiplayerProvider({ children }) {
       case 'MP_UPDATE_MAX_PLAYERS': actions.updateSettings('maxPlayers', Math.max(2, Math.min(22, action.payload))); break;
       case 'MP_UPDATE_OVERS': actions.updateSettings('oversPerInnings', action.payload); break;
       case 'MP_UPDATE_SERIES': actions.updateSettings('seriesLength', action.payload); break;
+      case 'MP_CLEAR_NOTICE':
+        setLocalState(s => ({ ...s, roomCode: '', notice: null }));
+        break;
       case 'MP_ADD_BOT': actions.addBot(Object.keys(state.players).length); break;
       case 'MP_TOGGLE_READY': actions.toggleReady(!state.players[localState.userId]?.isReady); break;
-      case 'MP_REMOVE_PLAYER': actions.removePlayer(action.payload); break;
+      case 'MP_REMOVE_PLAYER':
+        if (!isHost) break;
+        actions.removePlayer(action.payload);
+        break;
       case 'MP_START_GAME':
         if (!isHost) break;
         actions.startGame();
@@ -496,6 +591,13 @@ export function MultiplayerProvider({ children }) {
         });
         break;
       }
+      case 'MP_ADVANCE_PLAYER_INTRO': {
+        if (!isHost) break;
+        update(ref(db), {
+          [path('meta/status')]: 'MP_MATCH',
+        });
+        break;
+      }
 
       // SELECT
       case 'MP_SELECT_BATTER': {
@@ -508,7 +610,7 @@ export function MultiplayerProvider({ children }) {
           break;
         }
 
-        const nextPhase = state.activeBowlerId ? 'MP_MATCH' : 'MP_SELECT_BOWLER';
+        const nextPhase = state.activeBowlerId ? 'MP_PLAYER_INTRO' : 'MP_SELECT_BOWLER';
         update(ref(db), { 
           [path('match/activeBatterId')]: action.payload,
           [path('meta/status')]: nextPhase
@@ -527,7 +629,7 @@ export function MultiplayerProvider({ children }) {
 
         update(ref(db), {
           [path('match/activeBowlerId')]: action.payload,
-          [path('meta/status')]: 'MP_MATCH'
+          [path('meta/status')]: 'MP_PLAYER_INTRO'
         });
         break;
       }
@@ -537,7 +639,7 @@ export function MultiplayerProvider({ children }) {
         const dismissed = state.ballLog.filter(b => b.isOut).map(b => b.batterId);
         const avail = roster.filter(id => !dismissed.includes(id));
         if (avail.length > 0) {
-          const nextPhase = state.activeBowlerId ? 'MP_MATCH' : 'MP_SELECT_BOWLER';
+          const nextPhase = state.activeBowlerId ? 'MP_PLAYER_INTRO' : 'MP_SELECT_BOWLER';
           update(ref(db), {
             [path('match/activeBatterId')]: avail[0],
             [path('meta/status')]: nextPhase,
@@ -552,7 +654,7 @@ export function MultiplayerProvider({ children }) {
         if (avail.length > 0) {
           update(ref(db), {
             [path('match/activeBowlerId')]: avail[0],
-            [path('meta/status')]: 'MP_MATCH',
+            [path('meta/status')]: 'MP_PLAYER_INTRO',
           });
         }
         break;
@@ -560,6 +662,7 @@ export function MultiplayerProvider({ children }) {
 
       // MATCH MOVES & RESOLVE
       case 'MP_SUBMIT_MATCH_MOVE': {
+        if (state.phase !== 'MP_MATCH') break;
         const { role, move } = action.payload;
         const activePlayerId = role === 'batter' ? state.activeBatterId : state.activeBowlerId;
         const activePlayer = state.players[activePlayerId];
@@ -582,6 +685,7 @@ export function MultiplayerProvider({ children }) {
         break;
       }
       case 'MP_PROCESS_RESOLUTION': {
+        if (state.phase !== 'MP_RESOLVE_MOVE') break;
         if (!isHost) break; // Host computes and writes result to prevent dupes
         const { batterMove, bowlerMove } = state.lockedMoves;
         if (batterMove == null || bowlerMove == null) break;
@@ -936,9 +1040,33 @@ export function MultiplayerProvider({ children }) {
 
       // RESET
       case 'MP_RESET':
-      case 'MP_BACK_TO_GATEWAY':
-        setLocalState(s => ({ ...s, roomCode: '', phase: 'MP_GATEWAY' }));
+        if (!isHost) break;
+        update(ref(db), buildSeriesResetUpdates(state, path));
         break;
+      case 'MP_BACK_TO_GATEWAY':
+        setLocalState(s => ({ ...s, roomCode: '', phase: 'MP_GATEWAY', notice: null }));
+        break;
+      case 'MP_SEND_TEAM_CHAT': {
+        const rawMessage = action.payload?.message ?? '';
+        const message = rawMessage.trim();
+        if (!message) break;
+
+        const senderId = state.currentPlayerId;
+        const sender = state.players[senderId];
+        const team = getPlayerTeam(state, senderId);
+        if (!senderId || !sender || sender.isBot || !team) break;
+
+        const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        set(ref(db, path(`chat/messages/${messageId}`)), {
+          id: messageId,
+          team,
+          senderId,
+          senderName: sender.name,
+          text: message.slice(0, 240),
+          createdAt: Date.now(),
+        });
+        break;
+      }
       
       default:
         console.warn('Unhandled MP Action:', action.type);

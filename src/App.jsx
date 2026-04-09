@@ -18,10 +18,12 @@ import MPToss from './views/multiplayer/MPToss';
 import DraftPhase from './views/multiplayer/DraftPhase';
 import MPMatchToss from './views/multiplayer/MPMatchToss';
 import MPPreMatchSummary from './views/multiplayer/MPPreMatchSummary';
+import MPPlayerIntro from './views/multiplayer/MPPlayerIntro';
 import CaptainSelect from './views/multiplayer/CaptainSelect';
 import MPMatch from './views/multiplayer/MPMatch';
 import SuperOverSetup from './views/multiplayer/SuperOverSetup';
 import SuperOverMatch from './views/multiplayer/SuperOverMatch';
+import TeamChatWidget from './views/multiplayer/TeamChatWidget';
 
 function App() {
   const { state } = useGame();
@@ -47,6 +49,8 @@ function App() {
           return <MPMatchToss />;
         case 'MP_PRE_MATCH':
           return <MPPreMatchSummary />;
+        case 'MP_PLAYER_INTRO':
+          return <MPPlayerIntro />;
         case 'MP_SELECT_BATTER':
         case 'MP_SELECT_BOWLER':
           return <CaptainSelect />;
@@ -102,6 +106,7 @@ function App() {
       if (['MP_DRAFT'].includes(mp)) return 'mp-draft';
       if (['MP_MATCH_TOSS', 'MP_MATCH_TOSS_RESULT'].includes(mp)) return 'mp-match-toss';
       if (['MP_PRE_MATCH'].includes(mp)) return 'mp-pre-match';
+      if (['MP_PLAYER_INTRO'].includes(mp)) return 'mp-player-intro';
       if (['MP_SELECT_BATTER', 'MP_SELECT_BOWLER'].includes(mp)) return 'mp-captain-select';
       if (['MP_MATCH', 'MP_RESOLVE_MOVE', 'MP_INNINGS_BREAK', 'MP_MATCH_RESULT'].includes(mp)) return 'mp-match';
       if (['MP_SUPER_OVER_SETUP'].includes(mp)) return 'mp-so-setup';
@@ -160,6 +165,7 @@ function App() {
           </motion.div>
         </AnimatePresence>
       </div>
+      {mpState.phase !== 'MP_GATEWAY' && <TeamChatWidget />}
     </div>
   );
 }
@@ -167,7 +173,8 @@ function App() {
 /* ─── Multiplayer Series Result ─── */
 function MPSeriesResult() {
   const { state, dispatch } = useMultiplayer();
-  const { seriesScores, matchResults, seriesWinner, settings, players, captains } = state;
+  const { seriesScores, matchResults, seriesWinner, settings, players, captains, currentPlayerId, hostId } = state;
+  const isHost = currentPlayerId === hostId;
 
   const winnerLabel = seriesWinner === 'teamA' ? 'Team A' : 'Team B';
   const capA = players[captains.teamA];
@@ -238,17 +245,23 @@ function MPSeriesResult() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3">
-          <button
-            onClick={() => dispatch({ type: 'MP_RESET' })}
-            className="tactile-btn flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base"
-          >
-            New Series
-          </button>
+          {isHost ? (
+            <button
+              onClick={() => dispatch({ type: 'MP_RESET' })}
+              className="tactile-btn flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base"
+            >
+              New Series
+            </button>
+          ) : (
+            <div className="rounded-lg border border-arena-outline-variant/20 bg-arena-container px-5 py-3 text-sm text-arena-on-surface-faint text-center">
+              Waiting for host to start a new series...
+            </div>
+          )}
           <button
             onClick={() => dispatch({ type: 'MP_BACK_TO_GATEWAY' })}
             className="font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint hover:text-arena-on-surface-dim transition text-center"
           >
-            Back to Menu
+            Main Menu
           </button>
         </div>
       </motion.div>

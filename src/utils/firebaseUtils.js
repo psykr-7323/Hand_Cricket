@@ -99,6 +99,9 @@ export const mapFirebaseToState = (fb, localState) => {
   };
 
   const draftPool = fb.draft?.pool || [];
+  const chatMessages = Object.values(fb.chat?.messages || {}).sort(
+    (a, b) => (a?.createdAt ?? 0) - (b?.createdAt ?? 0)
+  );
   
   const matchTossMoves = { captainA: null, captainB: null, ...(fb.matchToss?.moves || {}) };
   const tossMoves = { captainA: null, captainB: null, ...(fb.toss?.moves || {}) };
@@ -128,6 +131,7 @@ export const mapFirebaseToState = (fb, localState) => {
     roomCode: localState.roomCode,
     hostId: fb.meta.hostId,
     currentPlayerId: localState.userId,
+    notice: localState.notice || null,
 
     settings: fb.settings || defaultSettings,
     players,
@@ -138,6 +142,7 @@ export const mapFirebaseToState = (fb, localState) => {
     draftTurn: fb.draft?.turn || 'teamA',
     draftTimer: DRAFT_TIMER, // UI handles countdown locally
     selectionTimer: SELECTION_TIMER, // UI handles countdown locally
+    chatMessages,
 
     tossAssignment: { odd: null, even: null, ...(fb.toss?.assignment || {}) },
     tossMoves,

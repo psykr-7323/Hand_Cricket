@@ -67,7 +67,7 @@ function MPPreMatchSummary() {
 
     const timer = window.setTimeout(() => {
       dispatch({ type: 'MP_ADVANCE_PRE_MATCH' });
-    }, 1800);
+    }, 6000);
 
     return () => window.clearTimeout(timer);
   }, [dispatch, isHost, phase]);

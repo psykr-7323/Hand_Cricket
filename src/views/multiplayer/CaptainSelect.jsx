@@ -19,6 +19,7 @@ function CaptainSelect() {
 
   const isBatterSelect = phase === 'MP_SELECT_BATTER';
   const relevantTeam = isBatterSelect ? battingTeam : bowlingTeam;
+  const relevantTeamLabel = relevantTeam === 'teamA' ? 'Team A' : 'Team B';
   const captainId = teams[relevantTeam]?.captainId;
   const captain = players[captainId];
   const roster = teams[relevantTeam]?.roster || [];
@@ -81,7 +82,7 @@ function CaptainSelect() {
             {isBatterSelect ? 'Select Batter' : 'Select Bowler'}
           </h2>
           <p className="mt-2 font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint">
-            {captain?.name}'s Decision
+            {relevantTeamLabel}: {captain?.name}&apos;s Decision
           </p>
         </div>
 

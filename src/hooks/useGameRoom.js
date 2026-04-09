@@ -22,14 +22,15 @@ export function useGameRoom(roomCode, userId) {
   const roomRef = useMemo(() => roomCode ? ref(db, `rooms/${roomCode}`) : null, [roomCode]);
 
   useEffect(() => {
-    if (!roomRef) return;
+    if (!roomRef) return undefined;
     const unsubscribe = onValue(roomRef, (snapshot) => {
       setRoomState(snapshot.exists() ? snapshot.val() : null);
     });
     return () => unsubscribe();
   }, [roomRef]);
 
-  const isHost = userId && roomState?.meta?.hostId === userId;
+  const effectiveRoomState = roomCode ? roomState : null;
+  const isHost = userId && effectiveRoomState?.meta?.hostId === userId;
 
   // -- Action Writers --
   const actions = useMemo(() => {
@@ -102,5 +103,5 @@ export function useGameRoom(roomCode, userId) {
     };
   }, [roomCode, userId]);
 
-  return { roomState, actions, isHost };
+  return { roomState: effectiveRoomState, actions, isHost };
 }

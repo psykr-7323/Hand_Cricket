@@ -4,7 +4,8 @@ import { Plus, LogIn, ArrowLeft, Users } from 'lucide-react';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 function MPGateway() {
-  const { dispatch } = useMultiplayer();
+  const { state, dispatch } = useMultiplayer();
+  const { notice } = state;
   const [mode, setMode] = useState(null); // null | 'create' | 'join'
   const [joinCode, setJoinCode] = useState(['', '', '', '']);
   const [playerName, setPlayerName] = useState('');
@@ -62,6 +63,24 @@ function MPGateway() {
         </motion.div>
 
         {/* Name Input */}
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 w-full max-w-md rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span>{notice}</span>
+              <button
+                onClick={() => dispatch({ type: 'MP_CLEAR_NOTICE' })}
+                className="font-display text-[10px] font-bold uppercase tracking-broadcast text-red-100/80 hover:text-white"
+              >
+                Dismiss
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
