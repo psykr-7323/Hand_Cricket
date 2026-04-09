@@ -34,6 +34,7 @@ export const createPlayerStats = () => ({
 export const createMatchState = () => ({
   battingTeam: null,
   bowlingTeam: null,
+  tossChoice: null,
   activeBatterId: null,
   activeBowlerId: null,
   innings: 1,

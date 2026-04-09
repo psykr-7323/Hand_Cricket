@@ -116,7 +116,7 @@ function CaptainReveal() {
                   {capA?.name ?? 'Pending'}
                 </p>
                 <p className="mt-1 rounded-md bg-arena-primary/10 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-broadcast text-arena-primary">
-                  Odd Side
+                  Team A Captain
                 </p>
               </motion.div>
 
@@ -146,7 +146,7 @@ function CaptainReveal() {
                   {capB?.name ?? 'Pending'}
                 </p>
                 <p className="mt-1 rounded-md bg-blue-500/10 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-broadcast text-blue-400">
-                  Even Side
+                  Team B Captain
                 </p>
               </motion.div>
             </div>

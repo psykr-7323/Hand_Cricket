@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../firebase.js';
-import { update, ref, set } from 'firebase/database';
+import { update, ref, runTransaction, set } from 'firebase/database';
 import { useGameRoom } from '../hooks/useGameRoom.js';
 import {
   OVER_OPTIONS, SERIES_OPTIONS, DRAFT_TIMER, SELECTION_TIMER, SUPER_OVER_BALLS,
@@ -36,6 +36,13 @@ const isValidSuperOverSelection = (roster, batters, bowler) => {
   if (roster.length >= 3 && uniqueBatters.includes(bowler)) return false;
 
   return true;
+};
+
+const getRemainingTossSide = (assignment) => {
+  const nextAssignment = { odd: null, even: null, ...(assignment || {}) };
+  if (nextAssignment.odd && !nextAssignment.even) return 'even';
+  if (nextAssignment.even && !nextAssignment.odd) return 'odd';
+  return null;
 };
 
 const computeSeriesWinner = (seriesScores, seriesLength) => {
@@ -89,7 +96,7 @@ const buildNextMatchUpdates = (state, path) => ({
   [path('settings/currentMatch')]: (state.settings.currentMatch ?? 1) + 1,
   [path('match')]: createMatchState(),
   [path('matchToss')]: {
-    assignment: { odd: state.captains.teamA, even: state.captains.teamB },
+    assignment: { odd: null, even: null },
     moves: { captainA: null, captainB: null },
     winner: null,
   },
@@ -164,7 +171,12 @@ export function MultiplayerProvider({ children }) {
       // Check if teams uneven -> add bot
       const rosterA = state.teams.teamA.roster;
       const rosterB = state.teams.teamB.roster;
-      let updates = { [path('meta/status')]: 'MP_MATCH_TOSS' };
+      let updates = {
+        [path('meta/status')]: 'MP_MATCH_TOSS',
+        [path('matchToss/assignment')]: { odd: null, even: null },
+        [path('matchToss/moves')]: { captainA: null, captainB: null },
+        [path('matchToss/winner')]: null,
+      };
 
       if (rosterA.length !== rosterB.length) {
         const smaller = rosterA.length < rosterB.length ? 'teamA' : 'teamB';
@@ -191,7 +203,7 @@ export function MultiplayerProvider({ children }) {
 
       update(ref(db), {
         [path('captains')]: { teamA: capA, teamB: capB },
-        [path('toss/assignment')]: { odd: capA, even: capB },
+        [path('toss/assignment')]: { odd: null, even: null },
         [path('teams')]: {
           teamA: { captainId: capA, roster: [capA], score: 0, wickets: 0 },
           teamB: { captainId: capB, roster: [capB], score: 0, wickets: 0 },
@@ -200,7 +212,13 @@ export function MultiplayerProvider({ children }) {
     }
 
     // 2. CAPTAIN TOSS RESOLVE
-    if (state.phase === 'MP_TOSS' && state.tossMoves.captainA != null && state.tossMoves.captainB != null) {
+    if (
+      state.phase === 'MP_TOSS' &&
+      state.tossAssignment.odd &&
+      state.tossAssignment.even &&
+      state.tossMoves.captainA != null &&
+      state.tossMoves.captainB != null
+    ) {
       const sum = state.tossMoves.captainA + state.tossMoves.captainB;
       const winnerTeam = (sum % 2 !== 0) 
         ? (state.tossAssignment.odd === state.captains.teamA ? 'teamA' : 'teamB')
@@ -213,7 +231,13 @@ export function MultiplayerProvider({ children }) {
     }
 
     // 3. MATCH TOSS RESOLVE
-    if (state.phase === 'MP_MATCH_TOSS' && state.matchTossMoves.captainA != null && state.matchTossMoves.captainB != null) {
+    if (
+      state.phase === 'MP_MATCH_TOSS' &&
+      state.matchTossAssignment.odd &&
+      state.matchTossAssignment.even &&
+      state.matchTossMoves.captainA != null &&
+      state.matchTossMoves.captainB != null
+    ) {
       const sum = state.matchTossMoves.captainA + state.matchTossMoves.captainB;
       const winnerTeam = (sum % 2 !== 0) 
         ? (state.matchTossAssignment.odd === state.captains.teamA ? 'teamA' : 'teamB')
@@ -287,6 +311,7 @@ export function MultiplayerProvider({ children }) {
         if (!isHost || !state.captains.teamA || !state.captains.teamB) break;
         update(ref(db), {
           [path('meta/status')]: 'MP_TOSS',
+          [path('toss/assignment')]: { odd: null, even: null },
           [path('toss/moves')]: { captainA: null, captainB: null },
           [path('toss/winner')]: null,
         });
@@ -294,25 +319,64 @@ export function MultiplayerProvider({ children }) {
 
       // TOSS
       case 'MP_SUBMIT_TOSS_MOVE': actions.submitTossMove(action.payload.who, action.payload.move); break;
-      case 'MP_CHOOSE_FIRST_PICK': {
-        const winningCaptainId = state.captains[state.tossWinner];
-        if (!winningCaptainId || state.currentPlayerId !== winningCaptainId) break;
+      case 'MP_CLAIM_TOSS_SIDE': {
+        const { side } = action.payload;
+        const team =
+          state.currentPlayerId === state.captains.teamA
+            ? 'teamA'
+            : state.currentPlayerId === state.captains.teamB
+              ? 'teamB'
+              : null;
+        if (!team || !['odd', 'even'].includes(side)) break;
 
-        const picksFirst = action.payload;
-        const firstTurn = picksFirst ? state.tossWinner : (state.tossWinner === 'teamA' ? 'teamB' : 'teamA');
-        const draftPool = Object.keys(state.players).filter(id => id !== state.captains.teamA && id !== state.captains.teamB);
-        
-        let updates = {
-           [path('draft/turn')]: firstTurn,
-           [path('draft/pool')]: draftPool
+        const captainId = state.captains[team];
+        const currentAssignment = { odd: null, even: null, ...state.tossAssignment };
+        if (currentAssignment.odd === captainId || currentAssignment.even === captainId) break;
+
+        runTransaction(ref(db, path('toss/assignment')), (assignment) => {
+          const nextAssignment = { odd: null, even: null, ...(assignment || {}) };
+          if (nextAssignment.odd === captainId || nextAssignment.even === captainId) return;
+          if (nextAssignment[side] && nextAssignment[side] !== captainId) return;
+          nextAssignment[side] = captainId;
+          return nextAssignment;
+        });
+        break;
+      }
+      case 'MP_AUTO_ASSIGN_TOSS_SIDE': {
+        if (!isHost) break;
+        const currentAssignment = { odd: null, even: null, ...state.tossAssignment };
+        const remainingSide = getRemainingTossSide(currentAssignment);
+        if (!remainingSide) break;
+        const assignedCaptainId = currentAssignment.odd || currentAssignment.even;
+        const remainingCaptainId =
+          assignedCaptainId === state.captains.teamA ? state.captains.teamB : state.captains.teamA;
+        if (!remainingCaptainId) break;
+
+        update(ref(db), {
+          [path(`toss/assignment/${remainingSide}`)]: remainingCaptainId,
+        });
+        break;
+      }
+      case 'MP_ADVANCE_AFTER_TOSS': {
+        if (!isHost || !state.tossWinner) break;
+
+        const draftPool = Object.keys(state.players).filter(
+          (id) => id !== state.captains.teamA && id !== state.captains.teamB
+        );
+        const updates = {
+          [path('draft/turn')]: state.tossWinner,
+          [path('draft/pool')]: draftPool,
         };
 
         if (draftPool.length === 0) {
-           updates[path('meta/status')] = 'MP_MATCH_TOSS';
-           updates[path('matchToss/assignment')] = { odd: state.captains.teamA, even: state.captains.teamB };
+          updates[path('meta/status')] = 'MP_MATCH_TOSS';
+          updates[path('matchToss/assignment')] = { odd: null, even: null };
+          updates[path('matchToss/moves')] = { captainA: null, captainB: null };
+          updates[path('matchToss/winner')] = null;
         } else {
-           updates[path('meta/status')] = 'MP_DRAFT';
+          updates[path('meta/status')] = 'MP_DRAFT';
         }
+
         update(ref(db), updates);
         break;
       }
@@ -357,6 +421,44 @@ export function MultiplayerProvider({ children }) {
 
       // MATCH TOSS
       case 'MP_SUBMIT_MATCH_TOSS': actions.submitMatchTossMove(action.payload.who, action.payload.move); break;
+      case 'MP_CLAIM_MATCH_TOSS_SIDE': {
+        const { side } = action.payload;
+        const team =
+          state.currentPlayerId === state.captains.teamA
+            ? 'teamA'
+            : state.currentPlayerId === state.captains.teamB
+              ? 'teamB'
+              : null;
+        if (!team || !['odd', 'even'].includes(side)) break;
+
+        const captainId = state.captains[team];
+        const currentAssignment = { odd: null, even: null, ...state.matchTossAssignment };
+        if (currentAssignment.odd === captainId || currentAssignment.even === captainId) break;
+
+        runTransaction(ref(db, path('matchToss/assignment')), (assignment) => {
+          const nextAssignment = { odd: null, even: null, ...(assignment || {}) };
+          if (nextAssignment.odd === captainId || nextAssignment.even === captainId) return;
+          if (nextAssignment[side] && nextAssignment[side] !== captainId) return;
+          nextAssignment[side] = captainId;
+          return nextAssignment;
+        });
+        break;
+      }
+      case 'MP_AUTO_ASSIGN_MATCH_TOSS_SIDE': {
+        if (!isHost) break;
+        const currentAssignment = { odd: null, even: null, ...state.matchTossAssignment };
+        const remainingSide = getRemainingTossSide(currentAssignment);
+        if (!remainingSide) break;
+        const assignedCaptainId = currentAssignment.odd || currentAssignment.even;
+        const remainingCaptainId =
+          assignedCaptainId === state.captains.teamA ? state.captains.teamB : state.captains.teamA;
+        if (!remainingCaptainId) break;
+
+        update(ref(db), {
+          [path(`matchToss/assignment/${remainingSide}`)]: remainingCaptainId,
+        });
+        break;
+      }
       case 'MP_CHOOSE_BAT_BOWL': {
         const winningCaptainId = state.captains[state.matchTossWinner];
         if (!winningCaptainId || state.currentPlayerId !== winningCaptainId) break;
@@ -373,9 +475,10 @@ export function MultiplayerProvider({ children }) {
         });
 
         update(ref(db), {
-          [path('meta/status')]: 'MP_SELECT_BATTER',
+          [path('meta/status')]: 'MP_PRE_MATCH',
           [path('match/battingTeam')]: batting,
           [path('match/bowlingTeam')]: bowling,
+          [path('match/tossChoice')]: choice,
           [path('match/innings')]: 1,
           [path('match/playerStats')]: stats,
           [path('match/lockedMoves')]: { batterMove: null, bowlerMove: null },
@@ -383,6 +486,13 @@ export function MultiplayerProvider({ children }) {
           [path('match/wickets')]: { batting: 0, bowling: 0 },
           [path('match/ballsBowled')]: 0,
           [path('resultMeta')]: null,
+        });
+        break;
+      }
+      case 'MP_ADVANCE_PRE_MATCH': {
+        if (!isHost) break;
+        update(ref(db), {
+          [path('meta/status')]: 'MP_SELECT_BATTER',
         });
         break;
       }

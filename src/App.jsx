@@ -17,6 +17,7 @@ import CaptainReveal from './views/multiplayer/CaptainReveal';
 import MPToss from './views/multiplayer/MPToss';
 import DraftPhase from './views/multiplayer/DraftPhase';
 import MPMatchToss from './views/multiplayer/MPMatchToss';
+import MPPreMatchSummary from './views/multiplayer/MPPreMatchSummary';
 import CaptainSelect from './views/multiplayer/CaptainSelect';
 import MPMatch from './views/multiplayer/MPMatch';
 import SuperOverSetup from './views/multiplayer/SuperOverSetup';
@@ -44,6 +45,8 @@ function App() {
         case 'MP_MATCH_TOSS':
         case 'MP_MATCH_TOSS_RESULT':
           return <MPMatchToss />;
+        case 'MP_PRE_MATCH':
+          return <MPPreMatchSummary />;
         case 'MP_SELECT_BATTER':
         case 'MP_SELECT_BOWLER':
           return <CaptainSelect />;
@@ -98,6 +101,7 @@ function App() {
       if (['MP_TOSS', 'MP_TOSS_RESULT'].includes(mp)) return 'mp-toss';
       if (['MP_DRAFT'].includes(mp)) return 'mp-draft';
       if (['MP_MATCH_TOSS', 'MP_MATCH_TOSS_RESULT'].includes(mp)) return 'mp-match-toss';
+      if (['MP_PRE_MATCH'].includes(mp)) return 'mp-pre-match';
       if (['MP_SELECT_BATTER', 'MP_SELECT_BOWLER'].includes(mp)) return 'mp-captain-select';
       if (['MP_MATCH', 'MP_RESOLVE_MOVE', 'MP_INNINGS_BREAK', 'MP_MATCH_RESULT'].includes(mp)) return 'mp-match';
       if (['MP_SUPER_OVER_SETUP'].includes(mp)) return 'mp-so-setup';
