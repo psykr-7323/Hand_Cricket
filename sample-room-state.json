@@ -1,0 +1,53 @@
+{
+  "room_code": "X7K9",
+  "host_id": "player_1",
+  "room_status": "in_progress",
+  "match_settings": {
+    "series_length": 3,
+    "current_match": 1
+  },
+  
+  "players": {
+    "player_1": { "name": "Rahul", "is_bot": false, "status": "online" },
+    "player_2": { "name": "Om", "is_bot": false, "status": "online" },
+    "player_3": { "name": "Priya", "is_bot": false, "status": "online" },
+    "bot_1": { "name": "SmartBot Alpha", "is_bot": true, "bot_style": "aggressive" }
+  },
+
+  "teams": {
+    "team_A": {
+      "captain_id": "player_1",
+      "roster": ["player_1", "player_3"],
+      "total_score": 42,
+      "wickets_lost": 1
+    },
+    "team_B": {
+      "captain_id": "player_2",
+      "roster": ["player_2", "bot_1"],
+      "total_score": 0,
+      "wickets_lost": 0
+    }
+  },
+
+  "current_match_state": {
+    "innings": 1,
+    "batting_team": "team_A",
+    "bowling_team": "team_B",
+    
+    "active_players": {
+      "current_batter_id": "player_3",
+      "current_bowler_id": "player_2"
+    },
+    
+    "current_over": {
+      "over_number": 2,
+      "balls_bowled": 4,
+      "runs_this_over": 12
+    },
+
+    "locked_moves": {
+      "batter_move": 4, 
+      "bowler_move": null
+    }
+  }
+}
