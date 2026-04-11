@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Bot, Copy, Check, Zap, Crown } from 'lucide-react';
+import { PlayerMarker } from '../../components/CricketIcons';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 function MPLobby() {
@@ -30,7 +31,7 @@ function MPLobby() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <button
-            onClick={() => dispatch({ type: 'MP_BACK_TO_GATEWAY' })}
+            onClick={() => dispatch({ type: 'MP_LEAVE_ROOM' })}
             className="flex h-10 w-10 items-center justify-center rounded-md bg-arena-container-highest text-arena-on-surface-dim transition hover:text-white"
           >
             <ArrowLeft size={18} />
@@ -102,7 +103,7 @@ function MPLobby() {
                 <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-xl text-2xl ${
                   player.isBot ? 'bg-blue-500/15' : 'bg-arena-container-highest'
                 }`}>
-                  {player.emoji}
+                  <PlayerMarker token={player.emoji} className="h-8 w-8" />
                 </div>
 
                 {/* Name */}

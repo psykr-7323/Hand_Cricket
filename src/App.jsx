@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Settings, User, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, User } from 'lucide-react';
 import { useGame } from './context/GameContext';
 import { useMultiplayer } from './context/MultiplayerContext';
 import MainMenu from './views/MainMenu';
@@ -22,12 +22,87 @@ import MPPlayerIntro from './views/multiplayer/MPPlayerIntro';
 import CaptainSelect from './views/multiplayer/CaptainSelect';
 import MPMatch from './views/multiplayer/MPMatch';
 import SuperOverSetup from './views/multiplayer/SuperOverSetup';
+import SuperOverReveal from './views/multiplayer/SuperOverReveal';
 import SuperOverMatch from './views/multiplayer/SuperOverMatch';
 import TeamChatWidget from './views/multiplayer/TeamChatWidget';
 
+const TEAM_CHAT_PHASES = new Set([
+  'MP_MATCH_TOSS',
+  'MP_MATCH_TOSS_RESULT',
+  'MP_PRE_MATCH',
+  'MP_PLAYER_INTRO',
+  'MP_SELECT_BATTER',
+  'MP_SELECT_BOWLER',
+  'MP_MATCH',
+  'MP_RESOLVE_MOVE',
+  'MP_INNINGS_BREAK',
+  'MP_MATCH_RESULT',
+  'MP_SUPER_OVER_SETUP',
+  'MP_SUPER_OVER_REVEAL',
+  'MP_SUPER_OVER',
+  'MP_RESOLVE_SO',
+  'MP_SUPER_OVER_RESULT',
+  'MP_SERIES_RESULT',
+]);
+
 function App() {
-  const { state } = useGame();
-  const { state: mpState } = useMultiplayer();
+  const { state, dispatch: gameDispatch } = useGame();
+  const { state: mpState, dispatch: mpDispatch } = useMultiplayer();
+  const [teamChatOpen, setTeamChatOpen] = useState(false);
+
+  const currentTeam = useMemo(() => {
+    if (mpState.teams?.teamA?.roster?.includes(mpState.currentPlayerId)) return 'teamA';
+    if (mpState.teams?.teamB?.roster?.includes(mpState.currentPlayerId)) return 'teamB';
+    return null;
+  }, [mpState.currentPlayerId, mpState.teams]);
+
+  const canOpenTeamChat =
+    TEAM_CHAT_PHASES.has(mpState.phase) &&
+    Boolean(currentTeam) &&
+    !mpState.players?.[mpState.currentPlayerId]?.isBot;
+
+  const backConfig = useMemo(() => {
+    if (mpState.phase !== 'MP_GATEWAY') {
+      if (mpState.phase === 'MP_MENU') {
+        return { label: 'Main Menu', action: 'mp-main-menu' };
+      }
+
+      if (['MP_CREATE_SETTINGS', 'MP_LOBBY'].includes(mpState.phase)) {
+        return { label: 'Back', action: 'mp-leave-room' };
+      }
+
+      return null;
+    }
+
+    if (state.currentPhase === 'LOBBY') {
+      return { label: 'Main Menu', action: 'sp-main-menu' };
+    }
+
+    if (['TOSS_SETUP', 'TOSS', 'TOSS_RESULT'].includes(state.currentPhase)) {
+      return { label: 'Lobby', action: 'sp-lobby' };
+    }
+
+    return null;
+  }, [mpState.phase, state.currentPhase]);
+
+  const handleBack = () => {
+    switch (backConfig?.action) {
+      case 'mp-main-menu':
+        mpDispatch({ type: 'MP_BACK_TO_GATEWAY' });
+        break;
+      case 'mp-leave-room':
+        mpDispatch({ type: 'MP_LEAVE_ROOM' });
+        break;
+      case 'sp-main-menu':
+        gameDispatch({ type: 'GO_TO_MAIN_MENU' });
+        break;
+      case 'sp-lobby':
+        gameDispatch({ type: 'BACK_TO_LOBBY' });
+        break;
+      default:
+        break;
+    }
+  };
 
   const renderPhase = () => {
     // ─── Multiplayer Phases ───
@@ -61,6 +136,8 @@ function App() {
           return <MPMatch />;
         case 'MP_SUPER_OVER_SETUP':
           return <SuperOverSetup />;
+        case 'MP_SUPER_OVER_REVEAL':
+          return <SuperOverReveal />;
         case 'MP_SUPER_OVER':
         case 'MP_RESOLVE_SO':
         case 'MP_SUPER_OVER_RESULT':
@@ -109,13 +186,16 @@ function App() {
       if (['MP_PLAYER_INTRO'].includes(mp)) return 'mp-player-intro';
       if (['MP_SELECT_BATTER', 'MP_SELECT_BOWLER'].includes(mp)) return 'mp-captain-select';
       if (['MP_MATCH', 'MP_RESOLVE_MOVE', 'MP_INNINGS_BREAK', 'MP_MATCH_RESULT'].includes(mp)) return 'mp-match';
-      if (['MP_SUPER_OVER_SETUP'].includes(mp)) return 'mp-so-setup';
-      if (['MP_SUPER_OVER', 'MP_RESOLVE_SO', 'MP_SUPER_OVER_RESULT'].includes(mp)) return 'mp-super-over';
+      if (['MP_SUPER_OVER_SETUP'].includes(mp)) return `mp-so-setup-${mpState.superOver?.sequence ?? 1}`;
+      if (['MP_SUPER_OVER_REVEAL'].includes(mp)) return `mp-so-reveal-${mpState.superOver?.sequence ?? 1}`;
+      if (['MP_SUPER_OVER', 'MP_RESOLVE_SO', 'MP_SUPER_OVER_RESULT'].includes(mp)) return `mp-super-over-${mpState.superOver?.sequence ?? 1}`;
       if (['MP_SERIES_RESULT'].includes(mp)) return 'mp-series-result';
       return mp;
     }
     const sp = state.currentPhase;
-    if (['TOSS_SETUP', 'TOSS', 'TOSS_RESULT'].includes(sp)) return 'sp-toss';
+    if (['TOSS_SETUP', 'TOSS', 'TOSS_RESULT'].includes(sp)) {
+      return `sp-toss-${state.match_settings.current_match}`;
+    }
     if (['MATCH', 'RESOLVE_MOVE', 'INNINGS_BREAK', 'MATCH_RESULT'].includes(sp)) return 'sp-match';
     return sp;
   };
@@ -128,21 +208,37 @@ function App() {
       {/* ─── Top Navbar ─── */}
       {showNavbar && (
         <header className="relative z-30 flex items-center justify-between border-b border-arena-outline-variant/15 bg-arena-surface px-4 py-3 sm:px-6">
-          <h1 className="esports-headline text-lg tracking-esports text-arena-primary">
-            Arena Pro
-          </h1>
+          <div className="flex items-center gap-3">
+            {backConfig && (
+              <button
+                onClick={handleBack}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-arena-outline-variant/20 bg-arena-container px-3 text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim transition hover:text-white"
+              >
+                <ArrowLeft size={15} />
+                <span className="hidden sm:inline">{backConfig.label}</span>
+              </button>
+            )}
+            <h1 className="esports-headline text-lg tracking-esports text-arena-primary">
+              Hand Cricket
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             {mpState.phase !== 'MP_GATEWAY' && (
               <span className="rounded-md bg-blue-500/15 px-3 py-1 font-display text-[10px] font-bold uppercase tracking-broadcast text-blue-400">
                 Multiplayer
               </span>
             )}
-            <button className="flex h-8 w-8 items-center justify-center rounded-md text-arena-on-surface-faint transition hover:text-arena-on-surface">
-              <Gamepad2 size={18} />
-            </button>
-            <button className="flex h-8 w-8 items-center justify-center rounded-md text-arena-on-surface-faint transition hover:text-arena-on-surface">
-              <Settings size={18} />
-            </button>
+            {canOpenTeamChat && (
+              <button
+                onClick={() => setTeamChatOpen(true)}
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-arena-primary/25 bg-arena-primary/10 px-3 text-xs font-bold uppercase tracking-broadcast text-arena-primary transition hover:bg-arena-primary/15"
+              >
+                <MessageSquare size={15} />
+                <span className="hidden sm:inline">
+                  {currentTeam === 'teamA' ? 'Team A Chat' : 'Team B Chat'}
+                </span>
+              </button>
+            )}
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-arena-primary/20 text-arena-primary">
               <User size={16} />
             </div>
@@ -165,7 +261,9 @@ function App() {
           </motion.div>
         </AnimatePresence>
       </div>
-      {mpState.phase !== 'MP_GATEWAY' && <TeamChatWidget />}
+      {mpState.phase !== 'MP_GATEWAY' && (
+        <TeamChatWidget open={canOpenTeamChat && teamChatOpen} onClose={() => setTeamChatOpen(false)} />
+      )}
     </div>
   );
 }

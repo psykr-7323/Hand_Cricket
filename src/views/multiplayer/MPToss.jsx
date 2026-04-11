@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import NumberPad from '../../components/NumberPad';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 const AUTO_ASSIGN_DELAY_MS = 4500;
@@ -158,18 +159,13 @@ function MPToss() {
                   ? 'You locked in your toss number. Waiting for opponent...'
                   : `${myAssignedSide === 'odd' ? 'Odd' : 'Even'} captain: pick your toss number (1-6)`}
               </p>
-              <div className={`mt-4 grid grid-cols-3 gap-3 ${myMoveLocked ? 'pointer-events-none opacity-40' : ''}`}>
-                {[1, 2, 3, 4, 5, 6].map((number) => (
-                  <motion.button
-                    key={number}
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => handleCaptainPick(number)}
-                    className="num-pad-btn py-5 text-2xl"
-                  >
-                    {number}
-                  </motion.button>
-                ))}
-              </div>
+              <NumberPad
+                options={[1, 2, 3, 4, 5, 6]}
+                onSelect={handleCaptainPick}
+                disabled={myMoveLocked}
+                className="mt-4"
+                buttonClassName="py-5 text-2xl"
+              />
             </div>
           )}
 

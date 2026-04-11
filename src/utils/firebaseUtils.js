@@ -4,7 +4,7 @@ export const DRAFT_TIMER = 15;
 export const SELECTION_TIMER = 15;
 export const SUPER_OVER_BALLS = 6;
 
-export const EMOJIS = ['🏏', '⚡', '🔥', '💎', '🎯', '🌟', '🦊', '🐉', '🦅', '🐺', '🦁', '🎭', '🛡️', '⚔️', '🏆', '🚀', '🌊', '🎪', '🎲', '💫', '🦈', '🐍'];
+export const EMOJIS = ['bat', 'ball'];
 
 export const BOT_NAMES = [
   'SmartBot Alpha', 'NeuralNet X', 'CyberStrike', 'PixelMind',
@@ -19,6 +19,11 @@ export const generateRoomCode = () => {
 
 export const generatePlayerId = () => `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 export const generateBotId = () => `bot_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+export const getPlayerEmojiForId = (id = '') => {
+  const hash = [...String(id)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return EMOJIS[hash % EMOJIS.length];
+};
 
 export const formatOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
 
@@ -55,6 +60,8 @@ export const createMatchState = () => ({
 });
 
 export const createSuperOverState = () => ({
+  sequence: 1,
+  initialBattingTeam: null,
   teamASelections: { batters: [], bowler: null },
   teamBSelections: { batters: [], bowler: null },
   teamALocked: false,
@@ -110,6 +117,8 @@ export const mapFirebaseToState = (fb, localState) => {
   
   const superOver = fb.superOver ? {
     ...fb.superOver,
+    sequence: fb.superOver.sequence ?? 1,
+    initialBattingTeam: fb.superOver.initialBattingTeam ?? null,
     teamASelections: {
       batters: fb.superOver.teamASelections?.batters || [],
       bowler: fb.superOver.teamASelections?.bowler || null

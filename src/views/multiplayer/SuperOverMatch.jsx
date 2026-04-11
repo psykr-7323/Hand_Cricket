@@ -1,9 +1,12 @@
 import React, { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
+import { CricketBallIcon, CricketBatIcon } from '../../components/CricketIcons';
+import NumberPad from '../../components/NumberPad';
 import { useMultiplayer, SUPER_OVER_BALLS } from '../../context/MultiplayerContext';
 
 const formatOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
+const MOVE_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
 function SuperOverMatch() {
   const { state, dispatch } = useMultiplayer();
@@ -38,14 +41,14 @@ function SuperOverMatch() {
 
     if (batter?.isBot && lockedMoves.batterMove == null) {
       const t = setTimeout(() => {
-        dispatch({ type: 'MP_SUBMIT_SO_MOVE', payload: { role: 'batter', move: Math.floor(Math.random() * 6) + 1 } });
+        dispatch({ type: 'MP_SUBMIT_SO_MOVE', payload: { role: 'batter', move: Math.floor(Math.random() * 7) } });
       }, 600 + Math.random() * 500);
       return () => clearTimeout(t);
     }
 
     if (bowler?.isBot && lockedMoves.bowlerMove == null) {
       const t = setTimeout(() => {
-        dispatch({ type: 'MP_SUBMIT_SO_MOVE', payload: { role: 'bowler', move: Math.floor(Math.random() * 6) + 1 } });
+        dispatch({ type: 'MP_SUBMIT_SO_MOVE', payload: { role: 'bowler', move: Math.floor(Math.random() * 7) } });
       }, 600 + Math.random() * 500);
       return () => clearTimeout(t);
     }
@@ -182,8 +185,14 @@ function SuperOverMatch() {
               <span className="pb-1 font-display text-xl font-bold text-arena-secondary">/{battingWickets}</span>
             </div>
             <div className="mt-2 flex gap-2">
-              <span className="stat-chip text-arena-on-surface-dim">🏏 {batter?.name}</span>
-              <span className="stat-chip text-arena-on-surface-dim">⚡ {bowler?.name}</span>
+              <span className="stat-chip inline-flex items-center gap-2 text-arena-on-surface-dim">
+                <CricketBatIcon className="h-4 w-4" />
+                {batter?.name}
+              </span>
+              <span className="stat-chip inline-flex items-center gap-2 text-arena-on-surface-dim">
+                <CricketBallIcon className="h-4 w-4" />
+                {bowler?.name}
+              </span>
             </div>
           </div>
 
@@ -238,6 +247,8 @@ function SuperOverMatch() {
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-3 flex justify-center">
                 {lockedMoves.batterMove === lockedMoves.bowlerMove ? (
                   <div className="rounded-lg bg-arena-secondary/15 border border-arena-secondary/30 px-6 py-2 esports-headline text-lg tracking-esports text-arena-secondary">Wicket!</div>
+                ) : lockedMoves.batterMove === 0 ? (
+                  <div className="rounded-lg border border-arena-outline-variant/25 bg-arena-container px-6 py-2 esports-headline text-lg tracking-esports text-arena-on-surface-dim">Dot Ball</div>
                 ) : (
                   <div className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-6 py-2 esports-headline text-lg tracking-esports text-amber-400">+{lockedMoves.batterMove} Runs</div>
                 )}
@@ -263,11 +274,12 @@ function SuperOverMatch() {
                 <h3 className="esports-headline text-xs tracking-esports text-arena-on-surface-dim mb-2">
                   {batter?.name}: Strike
                 </h3>
-                <div className={`grid grid-cols-3 gap-2 ${lockedMoves.batterMove !== null ? 'pointer-events-none opacity-40' : ''}`}>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <motion.button key={n} whileTap={{ scale: 0.94 }} onClick={() => handleBatterMove(n)} className="num-pad-btn py-3 text-xl">{n}</motion.button>
-                  ))}
-                </div>
+                <NumberPad
+                  options={MOVE_OPTIONS}
+                  onSelect={handleBatterMove}
+                  disabled={lockedMoves.batterMove !== null}
+                  buttonClassName="py-3 text-xl"
+                />
               </div>
             )}
             {!amIBatter && !batter?.isBot && !amIBowler && (
@@ -280,11 +292,12 @@ function SuperOverMatch() {
                 <h3 className="esports-headline text-xs tracking-esports text-arena-on-surface-dim mb-2">
                   {bowler?.name}: Bowl
                 </h3>
-                <div className={`grid grid-cols-3 gap-2 ${lockedMoves.bowlerMove !== null ? 'pointer-events-none opacity-40' : ''}`}>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <motion.button key={n} whileTap={{ scale: 0.94 }} onClick={() => handleBowlerMove(n)} className="num-pad-btn py-3 text-xl">{n}</motion.button>
-                  ))}
-                </div>
+                <NumberPad
+                  options={MOVE_OPTIONS}
+                  onSelect={handleBowlerMove}
+                  disabled={lockedMoves.bowlerMove !== null}
+                  buttonClassName="py-3 text-xl"
+                />
               </div>
             )}
             {!amIBowler && !bowler?.isBot && !amIBatter && (

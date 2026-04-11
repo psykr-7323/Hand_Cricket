@@ -3,6 +3,12 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Settings, Users, Zap } from 'lucide-react';
 import { useMultiplayer, OVER_OPTIONS, SERIES_OPTIONS } from '../../context/MultiplayerContext';
 
+const SERIES_LABELS = {
+  1: '1 Match',
+  3: '3 Match',
+  5: '5 Match',
+};
+
 function MPCreateSettings() {
   const { state, dispatch } = useMultiplayer();
   const { settings } = state;
@@ -15,7 +21,7 @@ function MPCreateSettings() {
         {/* Header */}
         <div className="w-full max-w-lg">
           <button
-            onClick={() => dispatch({ type: 'MP_BACK_TO_GATEWAY' })}
+            onClick={() => dispatch({ type: 'MP_LEAVE_ROOM' })}
             className="flex items-center gap-2 text-sm text-arena-on-surface-faint transition hover:text-white"
           >
             <ArrowLeft size={16} /> Back
@@ -116,10 +122,8 @@ function MPCreateSettings() {
               </p>
               <div className="mt-3 grid grid-cols-3 gap-3">
                 {[
-                  { length: 1, label: 'BO1', sub: 'One Shot' },
-                  { length: 3, label: 'BO3', sub: 'Trilogy' },
-                  { length: 5, label: 'BO5', sub: 'Marathon' },
-                ].map(({ length, label, sub }) => (
+                  ...SERIES_OPTIONS.map((length) => ({ length, label: SERIES_LABELS[length] || `${length} Matches` })),
+                ].map(({ length, label }) => (
                   <button
                     key={length}
                     onClick={() => dispatch({ type: 'MP_UPDATE_SERIES', payload: length })}
@@ -136,9 +140,6 @@ function MPCreateSettings() {
                     >
                       {label}
                     </span>
-                    <p className="mt-1 font-display text-[10px] uppercase tracking-broadcast text-arena-on-surface-faint">
-                      {sub}
-                    </p>
                   </button>
                 ))}
               </div>

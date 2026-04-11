@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useMultiplayer, DRAFT_TIMER } from '../../context/MultiplayerContext';
+import { PlayerMarker } from '../../components/CricketIcons';
 import ShotClock from '../../components/ShotClock';
 
 function DraftRosterColumn({ title, accentClass, borderClass, active, count, players, captainId }) {
@@ -23,7 +24,7 @@ function DraftRosterColumn({ title, accentClass, borderClass, active, count, pla
         {players.map((p) => (
           <div key={p.id} className="flex items-center gap-2 rounded-lg bg-arena-container-high p-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-arena-container-highest text-sm">
-              {p.emoji}
+              <PlayerMarker token={p.emoji} className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-xs font-bold text-white">{p.name}</p>
@@ -58,7 +59,7 @@ function DraftPoolPanel({ poolPlayers, canPick, onPick, activeCaptain }) {
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg text-lg ${
                 p.isBot ? 'bg-blue-500/15' : 'bg-arena-container-highest'
               }`}>
-                {p.emoji}
+                <PlayerMarker token={p.emoji} className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-display text-sm font-bold text-white">

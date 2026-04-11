@@ -4,22 +4,21 @@ import {
   ArrowRight,
   BarChart3,
   Bot,
-  Home,
   RotateCcw,
-  Target,
-  Trophy,
   Zap,
   X,
   TrendingUp,
   Award,
-  Crosshair,
 } from 'lucide-react';
 import { BOT, buildContextKey, getBotDecision } from '../ai/botBrain';
+import { PlayerMarker } from '../components/CricketIcons';
 import MoveTimer from '../components/MoveTimer';
+import NumberPad from '../components/NumberPad';
 import Scorecard from '../components/Scorecard';
 import { useGame } from '../context/GameContext';
 
 const formatOvers = (balls) => `${Math.floor(balls / 6)}.${balls % 6}`;
+const MOVE_OPTIONS = [0, 1, 2, 3, 4, 5, 6];
 
 /* ─── OUT Overlay (screen9) ─── */
 function OutOverlay({ onContinue, score, wickets, balls, botName }) {
@@ -159,22 +158,6 @@ function InningsBreak({ score, wickets, oversDisplay, target, onAdvance, matchSe
           <ArrowRight size={20} />
           Start Next Innings
         </button>
-
-        {/* Decorative footer */}
-        <div className="mt-8 flex items-center justify-center gap-6">
-          {[
-            '👥 14,204 Spectators',
-            '🏟️ Stadium: Velocity Prime',
-            '🖥️ Server: Mumbai_Central_02',
-          ].map((text) => (
-            <span
-              key={text}
-              className="stat-chip text-arena-on-surface-faint"
-            >
-              {text}
-            </span>
-          ))}
-        </div>
       </motion.div>
     </div>
   );
@@ -244,7 +227,11 @@ function VictoryResult({ resultMeta, matchStats, matchSettings, ballLog, oversDi
             </p>
             <div className="mt-3 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-arena-container-highest text-xl">
-                {resultMeta.playerWon ? '🏏' : '🤖'}
+                {resultMeta.playerWon ? (
+                  <PlayerMarker token="bat" className="h-7 w-7" />
+                ) : (
+                  '🤖'
+                )}
               </div>
               <div>
                 <p className="font-display text-sm font-bold uppercase tracking-wide text-white">
@@ -451,6 +438,44 @@ function FeedItem({ ball }) {
   );
 }
 
+function QuitConfirmModal({ onCancel, onConfirm }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex items-center justify-center bg-arena-void/85 px-4 backdrop-blur-xl"
+    >
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="w-full max-w-md rounded-2xl border border-red-500/25 bg-arena-surface p-6 text-center shadow-2xl"
+      >
+        <h3 className="esports-headline text-2xl tracking-esports text-white">
+          Quit Match?
+        </h3>
+        <p className="mt-3 text-sm text-arena-on-surface-faint">
+          If you quit now, this match will be recorded as a loss.
+        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={onConfirm}
+            className="tactile-btn-danger flex-1 rounded-lg px-5 py-3 text-sm font-display font-bold uppercase tracking-broadcast"
+          >
+            Quit And Take Loss
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-lg border border-arena-outline-variant/20 bg-arena-container px-5 py-3 text-sm font-display font-bold uppercase tracking-broadcast text-arena-on-surface-dim transition hover:text-white"
+          >
+            Keep Playing
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ─── Main Match Component ─── */
 function Match() {
   const { state, dispatch } = useGame();
@@ -475,6 +500,7 @@ function Match() {
   } = state;
 
   const [scorecardOpen, setScorecardOpen] = useState(false);
+  const [quitPromptOpen, setQuitPromptOpen] = useState(false);
   const bowler = players[bowling_player];
   const myMove = player_role === 'batter' ? locked_moves.batter_move : locked_moves.bowler_move;
   const oversLimit = match_settings.overs_per_innings;
@@ -669,6 +695,13 @@ function Match() {
               M{match_settings.current_match}/{match_settings.series_length}
             </span>
             <button
+              onClick={() => setQuitPromptOpen(true)}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 text-xs font-bold uppercase tracking-broadcast text-red-200 transition hover:bg-red-500/15"
+            >
+              <X size={14} />
+              <span className="hidden sm:inline">Quit</span>
+            </button>
+            <button
               onClick={() => setScorecardOpen(true)}
               className="flex h-9 w-9 items-center justify-center rounded-md bg-arena-container-highest text-arena-on-surface-dim transition hover:text-white"
             >
@@ -716,19 +749,19 @@ function Match() {
             </div>
 
             {/* Stats Chips */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {target && innings === 2 && (
-                <span className="stat-chip text-arena-primary">
-                  Target: {target}
-                </span>
-              )}
-              <span className="stat-chip text-arena-on-surface-dim">
-                RR: {derivedStats.currentRunRate.toFixed(1)}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {target && innings === 2 && (
+              <span className="stat-chip text-arena-primary">
+                Target: {target}
               </span>
-              {innings === 2 && target && (
-                <span className="stat-chip text-arena-secondary">
-                  RR Required: {derivedStats.requiredRunRate.toFixed(1)}
-                </span>
+            )}
+            <span className="stat-chip text-arena-on-surface-dim">
+              RR: {derivedStats.currentRunRate.toFixed(1)}
+            </span>
+            {innings === 2 && target && (
+              <span className="stat-chip text-arena-secondary">
+                RR Required: {derivedStats.requiredRunRate.toFixed(1)}
+              </span>
               )}
             </div>
           </div>
@@ -740,7 +773,7 @@ function Match() {
                 key={`${innings}-${balls_bowled}-${player_role}`}
                 duration={timerDuration}
                 isActive={currentPhase === 'MATCH' && myMove === null}
-                onExpire={() => handleMove(Math.floor(Math.random() * 6) + 1)}
+                onExpire={() => handleMove(Math.floor(Math.random() * 7))}
               />
             </div>
           )}
@@ -847,6 +880,10 @@ function Match() {
                       <div className="rounded-lg bg-arena-secondary/15 border border-arena-secondary/30 px-6 py-2.5 esports-headline text-xl tracking-esports text-arena-secondary">
                         Wicket!
                       </div>
+                    ) : locked_moves.batter_move === 0 ? (
+                      <div className="rounded-lg border border-arena-outline-variant/25 bg-arena-container px-6 py-2.5 esports-headline text-xl tracking-esports text-arena-on-surface-dim">
+                        Dot Ball
+                      </div>
                     ) : (
                       <div className="rounded-lg bg-arena-primary/15 border border-arena-primary/30 px-6 py-2.5 esports-headline text-xl tracking-esports text-arena-primary">
                         +{locked_moves.batter_move} Runs
@@ -891,22 +928,13 @@ function Match() {
                 {player_role === 'batter' ? 'Select Your Strike' : 'Bowl Your Delivery'}
               </h3>
             </div>
-            <div
-              className={`mt-3 grid grid-cols-3 gap-2.5 lg:grid-cols-2 ${
-                myMove !== null ? 'pointer-events-none opacity-40' : ''
-              }`}
-            >
-              {[1, 2, 3, 4, 5, 6].map((number) => (
-                <motion.button
-                  key={number}
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => handleMove(number)}
-                  className="num-pad-btn py-4 text-2xl lg:py-6"
-                >
-                  {number}
-                </motion.button>
-              ))}
-            </div>
+            <NumberPad
+              options={MOVE_OPTIONS}
+              onSelect={handleMove}
+              disabled={myMove !== null}
+              className="mt-3"
+              buttonClassName="py-4 text-2xl lg:py-6"
+            />
 
             {/* Live Match Feed */}
             <div className="mt-4 hidden lg:block">
@@ -925,31 +953,17 @@ function Match() {
           </div>
         )}
       </div>
-
-      {/* ─── Bottom Nav (mobile only) ─── */}
-      <div className="flex items-center justify-around border-t border-arena-outline-variant/15 bg-arena-surface px-2 py-2 lg:hidden">
-        {[
-          { icon: Crosshair, label: 'Arena', active: true },
-          { icon: BarChart3, label: 'Stats' },
-          { icon: Trophy, label: 'Leaderboard' },
-          { icon: Home, label: 'Gear' },
-        ].map((item) => {
-          const IconComponent = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              onClick={item.label === 'Stats' ? () => setScorecardOpen(true) : undefined}
-              className={`flex flex-col items-center gap-1 px-3 py-1 ${
-                item.active ? 'text-arena-primary' : 'text-arena-on-surface-faint'
-              }`}
-            >
-              <IconComponent size={18} />
-              <span className="font-display text-[9px] uppercase tracking-broadcast">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      <AnimatePresence>
+        {quitPromptOpen && (
+          <QuitConfirmModal
+            onCancel={() => setQuitPromptOpen(false)}
+            onConfirm={() => {
+              setQuitPromptOpen(false);
+              dispatch({ type: 'FORFEIT_MATCH' });
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

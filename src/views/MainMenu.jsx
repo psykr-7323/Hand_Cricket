@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Swords, Trophy, BarChart3, Zap } from 'lucide-react';
+import { Bot, Swords } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 import { useMultiplayer } from '../context/MultiplayerContext';
 
@@ -85,35 +85,6 @@ function MainMenu() {
           </button>
         </motion.div>
 
-        {/* Bottom Decorative Nav */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-auto flex w-full max-w-lg items-center justify-around border-t border-arena-outline-variant/15 pt-5"
-        >
-          {[
-            { icon: Zap, label: 'Play', active: true },
-            { icon: Trophy, label: 'Tournament' },
-            { icon: BarChart3, label: 'Rankings' },
-          ].map((item) => {
-            const IconComponent = item.icon;
-
-            return (
-              <div
-                key={item.label}
-                className={`flex flex-col items-center gap-1.5 ${
-                  item.active ? 'text-arena-primary' : 'text-arena-on-surface-faint'
-                }`}
-              >
-                <IconComponent size={20} />
-                <span className="font-display text-[10px] font-medium uppercase tracking-broadcast">
-                  {item.label}
-                </span>
-              </div>
-            );
-          })}
-        </motion.div>
       </div>
     </div>
   );

@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Coins, Zap } from 'lucide-react';
+import NumberPad from '../components/NumberPad';
 import { useGame } from '../context/GameContext';
+
+const TOSS_NUMBERS = [0, 1, 2, 3, 4, 5, 6];
 
 function TossSetup({ onDone }) {
   const [stage, setStage] = useState('flip');
 
   useEffect(() => {
-    const revealTimer = window.setTimeout(() => setStage('assigned'), 1100);
-    const doneTimer = window.setTimeout(() => onDone(), 2200);
+    const revealTimer = window.setTimeout(() => setStage('ready'), 900);
+    const doneTimer = window.setTimeout(() => onDone(), 1800);
     return () => {
       window.clearTimeout(revealTimer);
       window.clearTimeout(doneTimer);
@@ -35,31 +38,18 @@ function TossSetup({ onDone }) {
               <h2 className="esports-headline mt-3 text-2xl tracking-esports text-white">
                 Flipping the coin
               </h2>
-              <p className="mt-2 text-sm text-arena-on-surface-faint">Assigning odd and even...</p>
+              <p className="mt-2 text-sm text-arena-on-surface-faint">
+                Getting the odd-even toss ready...
+              </p>
             </motion.div>
           ) : (
-            <motion.div key="assigned" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div key="ready" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               <h2 className="esports-headline mt-3 text-2xl tracking-esports text-white">
-                Sides Assigned
+                Toss Ready
               </h2>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-arena-primary/10 border border-arena-primary/30 px-4 py-3">
-                  <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-primary">
-                    Your Side
-                  </p>
-                  <p className="esports-headline mt-1.5 text-xl tracking-esports text-arena-primary">
-                    Odd
-                  </p>
-                </div>
-                <div className="rounded-lg bg-arena-container-highest px-4 py-3">
-                  <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-on-surface-faint">
-                    Bot Side
-                  </p>
-                  <p className="esports-headline mt-1.5 text-xl tracking-esports text-arena-on-surface-dim">
-                    Even
-                  </p>
-                </div>
-              </div>
+              <p className="mt-3 text-sm text-arena-on-surface-faint">
+                Claim odd or even first, then lock in your toss number.
+              </p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -68,7 +58,7 @@ function TossSetup({ onDone }) {
   );
 }
 
-function TossReveal({ tossResult, tossMoves, onChoose }) {
+function TossReveal({ tossResult, tossMoves, playerSide, botSide, onChoose }) {
   const [revealCountdown, setRevealCountdown] = useState(3);
 
   useEffect(() => {
@@ -89,8 +79,7 @@ function TossReveal({ tossResult, tossMoves, onChoose }) {
   }, [revealCountdown, tossResult.playerWon, onChoose]);
 
   const showReveal = revealCountdown === 0;
-  const sum = tossMoves.player + tossMoves.bot;
-  const parity = sum % 2 === 0 ? 'Even' : 'Odd';
+  const sideText = tossResult.parity === 'even' ? 'Even' : 'Odd';
 
   return (
     <motion.div
@@ -110,7 +99,25 @@ function TossReveal({ tossResult, tossMoves, onChoose }) {
         </div>
       ) : (
         <div className="text-center">
-          {/* Move Display */}
+          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-arena-primary/30 bg-arena-primary/10 px-4 py-3">
+              <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-primary">
+                You
+              </p>
+              <p className="mt-1 font-display text-lg font-bold uppercase text-white">
+                {playerSide}
+              </p>
+            </div>
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3">
+              <p className="font-display text-[10px] uppercase tracking-broadcast text-blue-400">
+                Bot
+              </p>
+              <p className="mt-1 font-display text-lg font-bold uppercase text-white">
+                {botSide}
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-center gap-4">
             <div className="rounded-lg bg-arena-container-highest px-5 py-4">
               <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-on-surface-faint">
@@ -139,12 +146,11 @@ function TossReveal({ tossResult, tossMoves, onChoose }) {
                 Total
               </p>
               <div className="esports-headline mt-1 text-2xl tracking-esports text-white">
-                {sum} ({parity})
+                {tossResult.sum} ({sideText})
               </div>
             </div>
           </div>
 
-          {/* Winner Banner */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -160,7 +166,6 @@ function TossReveal({ tossResult, tossMoves, onChoose }) {
             </h3>
           </motion.div>
 
-          {/* Choice Buttons */}
           {tossResult.playerWon ? (
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
@@ -193,24 +198,44 @@ function TossReveal({ tossResult, tossMoves, onChoose }) {
 function Toss() {
   const { state, dispatch } = useGame();
   const { toss_moves, currentPhase } = state;
+  const [playerSide, setPlayerSide] = useState(null);
+  const [botSide, setBotSide] = useState(null);
 
   useEffect(() => {
-    if (currentPhase !== 'TOSS' || toss_moves.bot !== null) return undefined;
+    if (currentPhase !== 'TOSS' || !playerSide || botSide) return undefined;
+    const timer = window.setTimeout(() => {
+      setBotSide(playerSide === 'odd' ? 'even' : 'odd');
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [botSide, currentPhase, playerSide]);
+
+  useEffect(() => {
+    if (
+      currentPhase !== 'TOSS' ||
+      !playerSide ||
+      !botSide ||
+      toss_moves.player === null ||
+      toss_moves.bot !== null
+    ) {
+      return undefined;
+    }
     const timer = window.setTimeout(() => {
       dispatch({
         type: 'SUBMIT_TOSS_MOVE',
-        payload: { who: 'bot', move: Math.floor(Math.random() * 6) + 1 },
+        payload: { who: 'bot', move: Math.floor(Math.random() * 7) },
       });
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [currentPhase, toss_moves.bot, dispatch]);
+  }, [botSide, currentPhase, dispatch, playerSide, toss_moves.bot, toss_moves.player]);
 
   const tossResult = useMemo(() => {
-    if (toss_moves.player === null || toss_moves.bot === null) return null;
+    if (toss_moves.player === null || toss_moves.bot === null || !playerSide) return null;
     const sum = toss_moves.player + toss_moves.bot;
-    return { sum, playerWon: sum % 2 !== 0 };
-  }, [toss_moves]);
+    const parity = sum % 2 === 0 ? 'even' : 'odd';
+    return { sum, parity, playerWon: parity === playerSide };
+  }, [playerSide, toss_moves]);
 
+  const assignmentComplete = Boolean(playerSide && botSide);
   const locked = toss_moves.player !== null;
 
   if (currentPhase === 'TOSS_SETUP') {
@@ -220,57 +245,95 @@ function Toss() {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 pb-6 pt-6 sm:px-6">
       <div className="w-full max-w-lg">
-        {/* Header */}
         <div className="mb-6 text-center">
           <h2 className="esports-headline text-4xl tracking-[0.15em] text-white sm:text-5xl">
             The Toss
           </h2>
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <span className="rounded-md bg-arena-primary/15 border border-arena-primary/30 px-4 py-1.5 font-display text-xs font-bold uppercase tracking-broadcast text-arena-primary">
-              Your Side: Odd
-            </span>
-            <span className="rounded-md bg-arena-container-highest px-4 py-1.5 font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
-              Bot Side: Even
-            </span>
-          </div>
+          <p className="mt-4 font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint">
+            Claim odd or even first, then pick your toss number
+          </p>
         </div>
 
-        {/* Toss Number Selection */}
         {currentPhase === 'TOSS' && (
           <div className="arena-panel rounded-xl p-5">
-            <p className="text-center font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
-              {locked ? `You locked ${toss_moves.player}. BOT is choosing...` : 'Pick your toss number (1-6)'}
-            </p>
-            <div
-              className={`mt-4 grid grid-cols-3 gap-3 ${
-                locked ? 'pointer-events-none opacity-40' : ''
-              }`}
-            >
-              {[1, 2, 3, 4, 5, 6].map((number) => (
-                <motion.button
-                  key={number}
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() =>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-arena-outline-variant/20 bg-arena-container px-4 py-3 text-center">
+                <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-on-surface-faint">
+                  Your Side
+                </p>
+                <p className="mt-1 font-display text-lg font-bold text-arena-primary">
+                  {playerSide ? playerSide.toUpperCase() : 'Unclaimed'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-arena-outline-variant/20 bg-arena-container px-4 py-3 text-center">
+                <p className="font-display text-[10px] uppercase tracking-broadcast text-arena-on-surface-faint">
+                  Bot Side
+                </p>
+                <p className="mt-1 font-display text-lg font-bold text-arena-on-surface-dim">
+                  {botSide ? botSide.toUpperCase() : 'Waiting'}
+                </p>
+              </div>
+            </div>
+
+            {!playerSide && (
+              <div className="mt-5">
+                <p className="text-center font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
+                  Claim Odd or Even
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {['odd', 'even'].map((side) => (
+                    <button
+                      key={side}
+                      onClick={() => setPlayerSide(side)}
+                      className={`rounded-lg border px-4 py-3 font-display text-sm font-bold uppercase tracking-broadcast transition ${
+                        side === 'odd'
+                          ? 'border-arena-primary/30 bg-arena-primary/15 text-arena-primary hover:bg-arena-primary/20'
+                          : 'border-blue-500/30 bg-blue-500/15 text-blue-400 hover:bg-blue-500/20'
+                      }`}
+                    >
+                      {side}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {playerSide && !assignmentComplete && (
+              <div className="mt-5 rounded-lg border border-arena-outline-variant/20 bg-arena-container px-5 py-4 text-center text-sm text-arena-on-surface-faint">
+                You claimed <span className="font-bold uppercase text-white">{playerSide}</span>.
+                BOT is taking the remaining side...
+              </div>
+            )}
+
+            {assignmentComplete && (
+              <>
+                <p className="mt-5 text-center font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
+                  {locked ? `You locked ${toss_moves.player}. BOT is choosing...` : 'Pick your toss number (0-6)'}
+                </p>
+                <NumberPad
+                  options={TOSS_NUMBERS}
+                  disabled={locked}
+                  onSelect={(number) =>
                     dispatch({
                       type: 'SUBMIT_TOSS_MOVE',
                       payload: { who: 'player', move: number },
                     })
                   }
-                  className="num-pad-btn py-5 text-2xl"
-                >
-                  {number}
-                </motion.button>
-              ))}
-            </div>
+                  className="mt-4"
+                  buttonClassName="py-5 text-2xl"
+                />
+              </>
+            )}
           </div>
         )}
 
-        {/* Toss Result */}
         {currentPhase === 'TOSS_RESULT' && tossResult && (
           <TossReveal
             key={`${toss_moves.player}-${toss_moves.bot}`}
             tossResult={tossResult}
             tossMoves={toss_moves}
+            playerSide={playerSide}
+            botSide={botSide}
             onChoose={(choice) =>
               dispatch({ type: 'CHOOSE_BAT_BOWL', payload: { choice } })
             }

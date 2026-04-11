@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Coins } from 'lucide-react';
+import { PlayerMarker } from '../../components/CricketIcons';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 function TeamRosterCard({ teamKey, title, roster, isTossWinner }) {
@@ -30,7 +31,7 @@ function TeamRosterCard({ teamKey, title, roster, isTossWinner }) {
         {roster.map((player) => (
           <div key={player.id} className="flex items-center gap-3 rounded-lg bg-arena-container-high px-3 py-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-arena-container-highest text-lg">
-              {player.emoji}
+              <PlayerMarker token={player.emoji} className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-sm font-bold text-white">

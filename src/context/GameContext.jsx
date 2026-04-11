@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { BOT, buildContextKey } from '../ai/botBrain.js';
 import { getBotStats, recordMatchResult, recordMove } from '../ai/botDB.js';
+import { getPlayerEmojiForId } from '../utils/firebaseUtils.js';
 
 const PLAYER_ID = 'player_1';
 const BOT_ID = BOT.id;
@@ -53,7 +54,7 @@ const initialState = {
   currentPhase: 'MAIN_MENU',
   host_id: PLAYER_ID,
   players: {
-    [PLAYER_ID]: { id: PLAYER_ID, name: 'You', emoji: '🏏', is_bot: false },
+    [PLAYER_ID]: { id: PLAYER_ID, name: 'You', emoji: getPlayerEmojiForId(PLAYER_ID), is_bot: false },
     [BOT_ID]: { id: BOT_ID, ...BOT, is_bot: true },
   },
   match_settings: {
@@ -99,6 +100,21 @@ const getDisplayScore = (inningsResults, side, fallbackScore, fallbackWickets) =
   return `${inningsEntry?.score ?? fallbackScore}/${inningsEntry?.wickets ?? fallbackWickets}`;
 };
 
+const getLiveScoreStateForSide = (state, side) => {
+  const currentBattingSide = getSideKey(state.batting_player);
+  if (currentBattingSide === side) {
+    return {
+      score: state.score.batting,
+      wickets: state.wickets.batting,
+    };
+  }
+
+  return {
+    score: state.score.bowling,
+    wickets: state.wickets.bowling,
+  };
+};
+
 const createResultMeta = (state, battingScore, battingWickets, defenderWon) => {
   const inningsResults = [
     ...state.innings_results,
@@ -125,6 +141,29 @@ const createResultMeta = (state, battingScore, battingWickets, defenderWon) => {
         : `BOT chased ${state.target} cleanly.`,
     playerScore: getDisplayScore(inningsResults, 'player', battingScore, battingWickets),
     botScore: getDisplayScore(inningsResults, 'bot', battingScore, battingWickets),
+  };
+};
+
+const createForfeitResultMeta = (state) => {
+  const playerLive = getLiveScoreStateForSide(state, 'player');
+  const botLive = getLiveScoreStateForSide(state, 'bot');
+
+  return {
+    winner: 'bot',
+    playerWon: false,
+    summary: 'You quit the match. It counts as a loss.',
+    playerScore: getDisplayScore(
+      state.innings_results,
+      'player',
+      playerLive.score,
+      playerLive.wickets,
+    ),
+    botScore: getDisplayScore(
+      state.innings_results,
+      'bot',
+      botLive.score,
+      botLive.wickets,
+    ),
   };
 };
 
@@ -235,6 +274,13 @@ export function gameReducer(state = initialState, action) {
       return {
         ...state,
         currentPhase: 'TOSS',
+      };
+
+    case 'BACK_TO_LOBBY':
+      return {
+        ...state,
+        currentPhase: 'LOBBY',
+        ...createMatchState(),
       };
 
     case 'SUBMIT_TOSS_MOVE': {
@@ -538,6 +584,34 @@ export function gameReducer(state = initialState, action) {
         },
         ...createMatchState(),
       };
+
+    case 'FORFEIT_MATCH': {
+      const resultMeta = createForfeitResultMeta(state);
+      const updatedSeries = {
+        ...state.series_scores,
+        bot: state.series_scores.bot + 1,
+      };
+      const nextState = {
+        ...state,
+        currentPhase: 'MATCH_RESULT',
+        series_scores: updatedSeries,
+        series_winner: computeSeriesWinner(updatedSeries, state.match_settings.series_length),
+        result_meta: resultMeta,
+      };
+
+      return {
+        ...nextState,
+        match_results: [
+          ...state.match_results,
+          buildMatchResultPayload({
+            nextState,
+            state,
+            resultMeta,
+            updatedSeries,
+          }),
+        ],
+      };
+    }
 
     case 'SET_BOT_PROFILE_STATS':
       return {

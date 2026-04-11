@@ -7,7 +7,7 @@ export const BOT = {
   tagline: 'Learns from your habits and adjusts ball by ball.',
 };
 
-const MOVES = [1, 2, 3, 4, 5, 6];
+const MOVES = [0, 1, 2, 3, 4, 5, 6];
 const memoryCache = new Map();
 
 const weightedChoice = (weights) => {
@@ -99,6 +99,7 @@ const combinePredictions = (localPattern, cloudPattern) => {
 
 const getColdStartMove = () =>
   weightedChoice([
+    { value: 0, weight: 0.8 },
     { value: 1, weight: 1.05 },
     { value: 2, weight: 1.15 },
     { value: 3, weight: 1.3 },

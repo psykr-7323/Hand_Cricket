@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '../firebase.js';
-import { update, ref, runTransaction, set } from 'firebase/database';
+import { remove, update, ref, runTransaction, set } from 'firebase/database';
 import { useGameRoom } from '../hooks/useGameRoom.js';
 import {
   OVER_OPTIONS, SERIES_OPTIONS, DRAFT_TIMER, SELECTION_TIMER, SUPER_OVER_BALLS,
-  createMatchState, createSuperOverState, generateRoomCode, generatePlayerId, generateBotId, mapFirebaseToState, defaultSettings, formatOvers,
+  createMatchState, createSuperOverState, generateRoomCode, generatePlayerId, generateBotId, getPlayerEmojiForId, mapFirebaseToState, defaultSettings, formatOvers,
   BOT_NAMES
 } from '../utils/firebaseUtils.js';
 
@@ -138,17 +138,13 @@ const buildSeriesResetUpdates = (state, path) => {
   };
 };
 
-const decideSuperOverWinner = (score, wickets, fallbackWinner) => {
-  if (score.teamA !== score.teamB) {
-    return score.teamA > score.teamB ? 'teamA' : 'teamB';
-  }
-
-  if (wickets.teamA !== wickets.teamB) {
-    return wickets.teamA < wickets.teamB ? 'teamA' : 'teamB';
-  }
-
-  return fallbackWinner ?? 'teamA';
-};
+const createSuperOverSetupState = (initialBattingTeam, previousSuperOver = null) => ({
+  ...createSuperOverState(),
+  sequence: previousSuperOver ? (previousSuperOver.sequence ?? 1) + 1 : 1,
+  initialBattingTeam,
+  battingTeam: initialBattingTeam,
+  bowlingTeam: getOppositeTeam(initialBattingTeam),
+});
 
 export function MultiplayerProvider({ children }) {
   const [localState, setLocalState] = useState({
@@ -366,7 +362,7 @@ export function MultiplayerProvider({ children }) {
           settings: defaultSettings,
           players: {
             [localState.userId]: {
-              id: localState.userId, name: playerName, emoji: '🌟', isBot: false, isReady: true, isOnline: true
+              id: localState.userId, name: playerName, emoji: getPlayerEmojiForId(localState.userId), isBot: false, isReady: true, isOnline: true
             }
           }
         });
@@ -380,7 +376,7 @@ export function MultiplayerProvider({ children }) {
         // Can't await here directly but we run it
         update(ref(db), {
           [`rooms/${code}/players/${localState.userId}`]: {
-            id: localState.userId, name: name || 'Player', emoji: '🌟', isBot: false, isReady: false, isOnline: true
+            id: localState.userId, name: name || 'Player', emoji: getPlayerEmojiForId(localState.userId), isBot: false, isReady: false, isOnline: true
           }
         });
         break;
@@ -595,6 +591,13 @@ export function MultiplayerProvider({ children }) {
         if (!isHost) break;
         update(ref(db), {
           [path('meta/status')]: 'MP_MATCH',
+        });
+        break;
+      }
+      case 'MP_ADVANCE_SUPER_OVER_REVEAL': {
+        if (!isHost) break;
+        update(ref(db), {
+          [path('meta/status')]: 'MP_SUPER_OVER',
         });
         break;
       }
@@ -837,19 +840,11 @@ export function MultiplayerProvider({ children }) {
       case 'MP_START_SUPER_OVER': {
         if (!isHost) break;
         const superOverBattingTeam = state.battingTeam ?? 'teamA';
-        const superOverBowlingTeam =
-          state.bowlingTeam && state.bowlingTeam !== superOverBattingTeam
-            ? state.bowlingTeam
-            : getOppositeTeam(superOverBattingTeam);
 
         update(ref(db), {
           [path('meta/status')]: 'MP_SUPER_OVER_SETUP',
-          [path('superOver')]: {
-            ...createSuperOverState(),
-            // The team that batted second in the tied match bats first in the Super Over.
-            battingTeam: superOverBattingTeam,
-            bowlingTeam: superOverBowlingTeam,
-          },
+          // The team that batted second in the tied match bats first in the Super Over.
+          [path('superOver')]: createSuperOverSetupState(superOverBattingTeam),
         });
         break;
       }
@@ -902,7 +897,7 @@ export function MultiplayerProvider({ children }) {
           updates[path('superOver/ballLog')] = [];
           updates[path('superOver/lockedMoves')] = EMPTY_LOCKED_MOVES;
           updates[path('superOver/target')] = null;
-          updates[path('meta/status')] = 'MP_SUPER_OVER';
+          updates[path('meta/status')] = 'MP_SUPER_OVER_REVEAL';
         }
 
         update(ref(db), updates);
@@ -1008,16 +1003,22 @@ export function MultiplayerProvider({ children }) {
             updates[path('superOver/target')] = newScore[battingTeam] + 1;
             updates[path('meta/status')] = 'MP_SUPER_OVER';
           } else {
-            const winner = decideSuperOverWinner(newScore, newWickets, state.matchTossWinner);
-            const summary = `${winner === 'teamA' ? 'Team A' : 'Team B'} wins the Super Over.`;
-            const teamScores = { teamAScore: newScore.teamA, teamBScore: newScore.teamB };
-            const series = buildSeriesState(state, winner, teamScores, summary);
+            if (newScore.teamA === newScore.teamB) {
+              const initialBattingTeam = superOver.initialBattingTeam ?? superOver.bowlingTeam ?? 'teamA';
+              updates[path('superOver')] = createSuperOverSetupState(initialBattingTeam, superOver);
+              updates[path('meta/status')] = 'MP_SUPER_OVER_SETUP';
+            } else {
+              const winner = newScore.teamA > newScore.teamB ? 'teamA' : 'teamB';
+              const summary = `${winner === 'teamA' ? 'Team A' : 'Team B'} wins the Super Over.`;
+              const teamScores = { teamAScore: newScore.teamA, teamBScore: newScore.teamB };
+              const series = buildSeriesState(state, winner, teamScores, summary);
 
-            updates[path('resultMeta')] = { winner, summary, ...teamScores };
-            updates[path('series/scores')] = series.nextScores;
-            updates[path('series/results')] = series.nextResults;
-            updates[path('series/winner')] = series.nextWinner;
-            updates[path('meta/status')] = 'MP_SUPER_OVER_RESULT';
+              updates[path('resultMeta')] = { winner, summary, ...teamScores };
+              updates[path('series/scores')] = series.nextScores;
+              updates[path('series/results')] = series.nextResults;
+              updates[path('series/winner')] = series.nextWinner;
+              updates[path('meta/status')] = 'MP_SUPER_OVER_RESULT';
+            }
           }
         } else {
           updates[path('superOver/currentBatterIndex')] = nextBatterIndex;
@@ -1026,6 +1027,34 @@ export function MultiplayerProvider({ children }) {
         }
 
         update(ref(db), updates);
+        break;
+      }
+      case 'MP_FORFEIT_MATCH': {
+        if (!['MP_SUPER_OVER_SETUP', 'MP_SUPER_OVER_REVEAL', 'MP_SUPER_OVER', 'MP_RESOLVE_SO'].includes(state.phase)) break;
+
+        const forfeitingTeam =
+          state.currentPlayerId === state.captains.teamA
+            ? 'teamA'
+            : state.currentPlayerId === state.captains.teamB
+              ? 'teamB'
+              : null;
+        if (!forfeitingTeam) break;
+
+        const winner = getOppositeTeam(forfeitingTeam);
+        const teamScores = {
+          teamAScore: state.superOver?.score?.teamA ?? 0,
+          teamBScore: state.superOver?.score?.teamB ?? 0,
+        };
+        const summary = `${forfeitingTeam === 'teamA' ? 'Team A' : 'Team B'} forfeited the match. ${winner === 'teamA' ? 'Team A' : 'Team B'} wins.`;
+        const series = buildSeriesState(state, winner, teamScores, summary);
+
+        update(ref(db), {
+          [path('resultMeta')]: { winner, summary, ...teamScores },
+          [path('series/scores')]: series.nextScores,
+          [path('series/results')]: series.nextResults,
+          [path('series/winner')]: series.nextWinner,
+          [path('meta/status')]: 'MP_SUPER_OVER_RESULT',
+        });
         break;
       }
       case 'MP_FINISH_SUPER_OVER': {
@@ -1043,6 +1072,32 @@ export function MultiplayerProvider({ children }) {
         if (!isHost) break;
         update(ref(db), buildSeriesResetUpdates(state, path));
         break;
+      case 'MP_LEAVE_ROOM': {
+        if (!localState.roomCode) {
+          setLocalState(s => ({ ...s, roomCode: '', phase: 'MP_GATEWAY', notice: null }));
+          break;
+        }
+
+        const currentId = localState.userId;
+        const remainingIds = Object.keys(state.players || {}).filter((id) => id !== currentId);
+
+        if (remainingIds.length === 0) {
+          remove(ref(db, `rooms/${localState.roomCode}`));
+        } else if (state.hostId === currentId) {
+          const nextHostId = remainingIds.find((id) => !state.players[id]?.isBot) ?? remainingIds[0];
+          update(ref(db), {
+            [path(`players/${currentId}`)]: null,
+            [path('meta/hostId')]: nextHostId,
+          });
+        } else {
+          update(ref(db), {
+            [path(`players/${currentId}`)]: null,
+          });
+        }
+
+        setLocalState(s => ({ ...s, roomCode: '', phase: 'MP_GATEWAY', notice: null }));
+        break;
+      }
       case 'MP_BACK_TO_GATEWAY':
         setLocalState(s => ({ ...s, roomCode: '', phase: 'MP_GATEWAY', notice: null }));
         break;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PlayerMarker } from '../../components/CricketIcons';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 function CaptainReveal() {
@@ -64,7 +65,7 @@ function CaptainReveal() {
                   }}
                   className="flex h-12 w-12 items-center justify-center rounded-lg bg-arena-container-highest text-xl"
                 >
-                  {p.emoji}
+                  <PlayerMarker token={p.emoji} className="h-7 w-7" />
                 </motion.div>
               ))}
             </div>
@@ -110,7 +111,7 @@ function CaptainReveal() {
               >
                 <span className="captain-badge">Captain A</span>
                 <div className="mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-xl bg-arena-primary/15 text-4xl splash-scale">
-                  {capA?.emoji ?? '❔'}
+                  <PlayerMarker token={capA?.emoji} className="h-11 w-11" fallbackClassName="text-4xl" />
                 </div>
                 <p className="mt-3 font-display text-base font-bold text-white">
                   {capA?.name ?? 'Pending'}
@@ -140,7 +141,7 @@ function CaptainReveal() {
               >
                 <span className="captain-badge">Captain B</span>
                 <div className="mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-xl bg-blue-500/15 text-4xl splash-scale">
-                  {capB?.emoji ?? '❔'}
+                  <PlayerMarker token={capB?.emoji} className="h-11 w-11" fallbackClassName="text-4xl" />
                 </div>
                 <p className="mt-3 font-display text-base font-bold text-white">
                   {capB?.name ?? 'Pending'}

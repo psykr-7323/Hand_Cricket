@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Target, Crown } from 'lucide-react';
+import { PlayerMarker } from '../../components/CricketIcons';
 import { useMultiplayer, SELECTION_TIMER } from '../../context/MultiplayerContext';
 import ShotClock from '../../components/ShotClock';
 
@@ -24,6 +25,12 @@ function CaptainSelect() {
   const captain = players[captainId];
   const roster = teams[relevantTeam]?.roster || [];
   const canSelect = currentPlayerId === captainId && !captain?.isBot;
+  const viewerTeam = teams.teamA?.roster?.includes(currentPlayerId)
+    ? 'teamA'
+    : teams.teamB?.roster?.includes(currentPlayerId)
+      ? 'teamB'
+      : null;
+  const viewerIsRelevantTeam = viewerTeam === relevantTeam;
 
   // Find dismissed batters (they can't be re-selected)
   const dismissedIds = ballLog
@@ -98,66 +105,81 @@ function CaptainSelect() {
           />
         </div>
 
-        {/* Roster Grid */}
-        <div className="mt-5 arena-panel rounded-xl p-5">
-          <p className="mb-3 font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
-            {isBatterSelect ? 'Available Batters' : 'Available Bowlers'}
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {roster.map((id) => {
-              const player = players[id];
-              if (!player) return null;
+        {viewerIsRelevantTeam ? (
+          <>
+            <div className="mt-5 arena-panel rounded-xl p-5">
+              <p className="mb-3 font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
+                {isBatterSelect ? 'Available Batters' : 'Available Bowlers'}
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {roster.map((id) => {
+                  const player = players[id];
+                  if (!player) return null;
 
-              const isDismissed = isBatterSelect && dismissedIds.includes(id);
-              const isBlocked = !isBatterSelect && lastOverBowlerId === id && roster.length > 1;
-              const isDisabled = isDismissed || isBlocked;
+                  const isDismissed = isBatterSelect && dismissedIds.includes(id);
+                  const isBlocked = !isBatterSelect && lastOverBowlerId === id && roster.length > 1;
+                  const isDisabled = isDismissed || isBlocked;
 
-              return (
-                <motion.button
-                  key={id}
-                  whileTap={!isDisabled ? { scale: 0.95 } : {}}
-                  onClick={() => !isDisabled && canSelect && handleSelect(id)}
-                  disabled={isDisabled || !canSelect}
-                  className={`relative flex flex-col items-center gap-2 rounded-xl p-4 text-center transition ${
-                    isDisabled
-                      ? 'bg-arena-container opacity-30 cursor-not-allowed'
-                      : 'bg-arena-container-high hover:bg-arena-container-highest hover:border-arena-primary/30 border border-transparent cursor-pointer'
-                  }`}
-                >
-                  {id === captainId && (
-                    <div className="absolute -top-2 right-2">
-                      <Crown size={12} className="text-amber-500" />
-                    </div>
-                  )}
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-lg text-xl ${
-                    player.isBot ? 'bg-blue-500/15' : 'bg-arena-container-highest'
-                  }`}>
-                    {player.emoji}
-                  </div>
-                  <p className="truncate font-display text-xs font-bold text-white">
-                    {player.name}
-                  </p>
-                  {isDismissed && (
-                    <span className="font-display text-[10px] text-arena-secondary">Dismissed</span>
-                  )}
-                  {isBlocked && (
-                    <span className="font-display text-[10px] text-arena-on-surface-faint">Last Over</span>
-                  )}
-                  {!isDisabled && state.playerStats[id] && (
-                    <span className="font-display text-[10px] text-arena-on-surface-faint">
-                      {isBatterSelect
-                        ? `${state.playerStats[id].runs}(${state.playerStats[id].ballsFaced})`
-                        : `${state.playerStats[id].wickets}-${state.playerStats[id].runsConceded}`}
-                    </span>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-        {!canSelect && !captain?.isBot && (
-          <div className="mt-4 rounded-lg border border-arena-outline-variant/20 bg-arena-container px-4 py-3 text-sm text-arena-on-surface-faint">
-            Waiting for {captain?.name} to choose the next {isBatterSelect ? 'batter' : 'bowler'}...
+                  return (
+                    <motion.button
+                      key={id}
+                      whileTap={!isDisabled ? { scale: 0.95 } : {}}
+                      onClick={() => !isDisabled && canSelect && handleSelect(id)}
+                      disabled={isDisabled || !canSelect}
+                      className={`relative flex flex-col items-center gap-2 rounded-xl p-4 text-center transition ${
+                        isDisabled
+                          ? 'bg-arena-container opacity-30 cursor-not-allowed'
+                          : 'bg-arena-container-high hover:bg-arena-container-highest hover:border-arena-primary/30 border border-transparent cursor-pointer'
+                      }`}
+                    >
+                      {id === captainId && (
+                        <div className="absolute -top-2 right-2">
+                          <Crown size={12} className="text-amber-500" />
+                        </div>
+                      )}
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg text-xl ${
+                        player.isBot ? 'bg-blue-500/15' : 'bg-arena-container-highest'
+                      }`}>
+                        <PlayerMarker token={player.emoji} className="h-7 w-7" />
+                      </div>
+                      <p className="truncate font-display text-xs font-bold text-white">
+                        {player.name}
+                      </p>
+                      {isDismissed && (
+                        <span className="font-display text-[10px] text-arena-secondary">Dismissed</span>
+                      )}
+                      {isBlocked && (
+                        <span className="font-display text-[10px] text-arena-on-surface-faint">Last Over</span>
+                      )}
+                      {!isDisabled && state.playerStats[id] && (
+                        <span className="font-display text-[10px] text-arena-on-surface-faint">
+                          {isBatterSelect
+                            ? `${state.playerStats[id].runs}(${state.playerStats[id].ballsFaced})`
+                            : `${state.playerStats[id].wickets}-${state.playerStats[id].runsConceded}`}
+                        </span>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+            {!canSelect && !captain?.isBot && (
+              <div className="mt-4 rounded-lg border border-arena-outline-variant/20 bg-arena-container px-4 py-3 text-sm text-arena-on-surface-faint">
+                Waiting for {captain?.name} to choose the next {isBatterSelect ? 'batter' : 'bowler'}...
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="mt-5 arena-panel rounded-xl p-5 text-center">
+            <p className="font-display text-xs font-bold uppercase tracking-broadcast text-arena-on-surface-dim">
+              {relevantTeamLabel} is making the next call
+            </p>
+            <h3 className="esports-headline mt-3 text-xl tracking-esports text-white">
+              Waiting for {captain?.name} to choose the next {isBatterSelect ? 'batter' : 'bowler'}
+            </h3>
+            <p className="mt-3 text-sm text-arena-on-surface-faint">
+              Your side will stay on standby here, then the matchup reveal will appear before the next ball starts.
+            </p>
           </div>
         )}
       </div>

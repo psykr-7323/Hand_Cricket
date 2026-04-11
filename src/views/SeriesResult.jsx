@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Eye, RotateCcw, Trophy } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useGame } from '../context/GameContext';
 
 function SeriesResult() {
@@ -107,17 +107,12 @@ function SeriesResult() {
             <RotateCcw size={18} />
             New Series
           </button>
-          <div className="flex items-center justify-center gap-6">
-            <button className="font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint hover:text-arena-on-surface-dim transition">
-              View Full Replay
-            </button>
-            <button
-              onClick={() => dispatch({ type: 'RESET_GAME' })}
-              className="font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint hover:text-arena-on-surface-dim transition"
-            >
-              Back to Menu
-            </button>
-          </div>
+          <button
+            onClick={() => dispatch({ type: 'RESET_GAME' })}
+            className="font-display text-xs uppercase tracking-broadcast text-arena-on-surface-faint hover:text-arena-on-surface-dim transition"
+          >
+            Back to Menu
+          </button>
         </div>
       </motion.div>
     </div>

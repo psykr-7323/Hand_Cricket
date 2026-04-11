@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Target } from 'lucide-react';
+import { PlayerMarker } from '../../components/CricketIcons';
 import { useMultiplayer } from '../../context/MultiplayerContext';
 
 function IntroCard({ label, player, accentClass, bgClass, icon }) {
@@ -15,7 +16,7 @@ function IntroCard({ label, player, accentClass, bgClass, icon }) {
         {label}
       </p>
       <div className="mx-auto mt-4 flex h-16 w-16 items-center justify-center rounded-xl bg-arena-container-highest text-2xl">
-        {player?.emoji ?? '❔'}
+        <PlayerMarker token={player?.emoji} className="h-9 w-9" fallbackClassName="text-2xl" />
       </div>
       <p className={`mt-3 font-display text-lg font-bold ${accentClass}`}>
         {player?.name ?? 'Pending'}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase.js';
 import { ref, onValue, set, update, remove, serverTimestamp } from 'firebase/database';
-import { BOT_NAMES, EMOJIS, generateBotId } from '../utils/firebaseUtils.js';
+import { BOT_NAMES, getPlayerEmojiForId, generateBotId } from '../utils/firebaseUtils.js';
 
 // Helper to get a random bot
 const createBot = (existingPlayersCount) => {
@@ -51,7 +51,7 @@ export function useGameRoom(roomCode, userId) {
             [userId]: {
               id: userId,
               name,
-              emoji: EMOJIS[0],
+              emoji: getPlayerEmojiForId(userId),
               isBot: false,
               isReady: false,
               isOnline: true
@@ -65,7 +65,7 @@ export function useGameRoom(roomCode, userId) {
           [path(`players/${userId}`)]: {
             id: userId,
             name,
-            emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+            emoji: getPlayerEmojiForId(userId),
             isBot: false,
             isReady: false,
             isOnline: true
